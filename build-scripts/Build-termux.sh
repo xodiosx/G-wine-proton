@@ -135,6 +135,135 @@ do
 
     PATCHES=(
       "dlls_dnsapi_libresolv_c.patch"
+#!/bin/bash
+
+export ARCH="aarch64"
+export WIN_ARCH="aarch64,i386"                     # arm64ec removed
+export OUTPUT_DIR="$HOME/compiled-files-aarch64"
+
+export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
+export RUNTIME_PATH="/data/data/com.termux/files/usr"
+export install_dir=$deps/../opt/wine
+
+export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
+export LLVM_MINGW_TOOLCHAIN="$HOME/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64/bin"
+export TARGET=aarch64-linux-android28
+export PATH=$LLVM_MINGW_TOOLCHAIN:$PATH
+
+export CC=$TOOLCHAIN/$TARGET-clang
+export AS=$CC
+export CXX=$TOOLCHAIN/$TARGET-clang++
+export AR=$TOOLCHAIN/llvm-ar
+export LD=$TOOLCHAIN/ld
+export RANLIB=$TOOLCHAIN/llvm-ranlib
+export STRIP=$TOOLCHAIN/llvm-strip
+export DLLTOOL=$LLVM_MINGW_TOOLCHAIN/llvm-dlltool
+
+export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
+export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
+export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
+
+# Force conservative ARMv8.0 instruction set to avoid LSE/atomic instructions
+export C_OPTS="-march=armv8-a -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
+export CFLAGS="$C_OPTS"
+export CXXFLAGS="$C_OPTS"
+export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
+
+export FREETYPE_CFLAGS="-I$deps/include/freetype2"
+export PULSE_CFLAGS="-I$deps/include/pulse"
+export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
+export SDL2_CFLAGS="-I$deps/include/SDL2"
+export SDL2_LIBS="-L$deps/lib -lSDL2"
+export X_CFLAGS="-I$deps/include/X11"
+export X_LIBS=""                                   # No sysvshm
+export GSTREAMER_CFLAGS="-I$deps/include/gstreamer-1.0 -I$deps/include/glib-2.0 -I$deps/lib/glib-2.0/include -I$deps/glib-2.0/include -I$deps/lib/gstreamer-1.0/include"
+export GSTREAMER_LIBS="-L$deps/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
+export FFMPEG_CFLAGS="-I$deps/include/libavutil -I$deps/include/libavcodec -I$deps/include/libavformat"
+export FFMPEG_LIBS="-L$deps/lib -lavutil -lavcodec -lavformat"
+
+for arg in "$@"
+do
+  if [ "$arg" == "--enable-16kb-pages" ]; then
+    echo "Enabling 16KB page size support..."
+    export TARGET=aarch64-linux-android35
+    export C_OPTS="$C_OPTS -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES"
+    export CFLAGS="$C_OPTS"
+    export CXXFLAGS="$C_OPTS"
+    export LDFLAGS="$LDFLAGS -Wl,-z,max-page-size=16384"
+  fi
+
+  if [ "$arg" == "--build-sysvshm" ]; then
+    echo "Skipping sysvshm build (not needed for Termux)."
+    # No action
+  fi
+
+  if [ "$arg" == "--configure" ]; then
+    ./configure \
+      --enable-archs=$WIN_ARCH \
+      --host=$TARGET \
+      --prefix $install_dir \
+      --bindir $install_dir/bin \
+      --libdir $install_dir/lib \
+      --exec-prefix $install_dir \
+      --with-mingw=clang \
+      --with-wine-tools=./wine-tools \
+      --enable-win64 \
+      --disable-win16 \
+      --enable-nls \
+      --disable-amd_ags_x64 \
+      --enable-wineandroid_drv=no \
+      --disable-tests \
+      --with-alsa \
+      --without-capi \
+      --without-coreaudio \
+      --without-cups \
+      --without-dbus \
+      --without-ffmpeg \
+      --with-fontconfig \
+      --with-freetype \
+      --without-gcrypt \
+      --without-gettext \
+      --with-gettextpo=no \
+      --without-gphoto \
+      --with-gnutls \
+      --without-gssapi \
+      --with-gstreamer \
+      --without-inotify \
+      --without-krb5 \
+      --without-netapi \
+      --without-opencl \
+      --with-opengl \
+      --without-osmesa \
+      --without-oss \
+      --without-pcap \
+      --without-pcsclite \
+      --without-piper \
+      --with-pthread \
+      --with-pulse \
+      --without-sane \
+      --with-sdl \
+      --without-udev \
+      --without-unwind \
+      --without-usb \
+      --without-v4l2 \
+      --without-vosk \
+      --with-vulkan \
+      --without-wayland \
+      --without-xcomposite \
+      --without-xcursor \
+      --without-xfixes \
+      --without-xinerama \
+      --without-xrandr \
+      --without-xrender \
+      --without-xshape \
+      --without-xshm \
+      --without-xxf86vm
+
+    echo "Applying patches..."
+
+    # All patches except arm64ec-specific ones
+    PATCHES=(
+      "dlls_dnsapi_libresolv_c.patch"
       "dlls_dnsapi_record_c.patch"
       "dlls_nsiproxy_sys_ip_c.patch"
       "dlls_nsiproxy_sys_ndis_c.patch"
@@ -155,7 +284,7 @@ do
       "dlls_winex11_drv_window_c.patch"
       "dlls_winex11_drv_keyboard_c.patch"
       "dlls_winex11_drv_x11drv_main_c.patch"
-      "arm64ec/dlls_ntdll_unix_virtual_c.patch"
+      "arm64ec/dlls_ntdll_unix_virtual_c.patch"   # still needed for aarch64 virtual.c
       "loader_preloader_c.patch"
       "dlls_ntdll_unix_signal_x86_64_c.patch"
       "dlls_winepulse_drv_pulse_c.patch"
@@ -172,20 +301,20 @@ do
       "dlls_user32_makefile_in.patch"
       "dlls_ntdll_loader_c.patch"
       "dlls_ntdll_unix_loader_c.patch"
-      "dlls_wow64_syscall_c.patch"
-      "loader_wine_inf_in.patch"
+      # "dlls_wow64_syscall_c.patch"               # arm64ec specific – removed
+      # "loader_wine_inf_in.patch"                 # arm64ec specific – removed
       "programs_wineboot_wineboot_c.patch"
       "dlls_wdscore_wdscore_spec.patch"
       "test-bylaws/dlls_ntdll_unwind_h.patch"
       "test-bylaws/include_winnt_h.patch"
       "test-bylaws/dlls_ntdll_signal_arm64_c.patch"
-      "test-bylaws/dlls_ntdll_signal_arm64ec_c.patch"
+      # "test-bylaws/dlls_ntdll_signal_arm64ec_c.patch"   # arm64ec specific – removed
       "test-bylaws/dlls_ntdll_signal_x86_64_c.patch"
       "test-bylaws/dlls_ntdll_ntdll_spec.patch"
       "test-bylaws/dlls_ntdll_ntdll_misc_h.patch"
-      "test-bylaws/dlls_wow64_process_c.patch"
-      "test-bylaws/dlls_wow64_wow64_spec.patch"
-      "test-bylaws/dlls_wow64_virtual_c.patch"
+      "test-bylaws/dlls_wow64_process_c.patch"      # may still be needed for WOW64
+      # "test-bylaws/dlls_wow64_wow64_spec.patch"   # arm64ec specific – removed
+      # "test-bylaws/dlls_wow64_virtual_c.patch"    # arm64ec specific – removed
       "test-bylaws/server_process_c.patch"
       "test-bylaws/dlls_ntdll_unix_process_c.patch"
       "test-bylaws/server_thread_h.patch"
@@ -195,19 +324,21 @@ do
     )
 
     for patch in "${PATCHES[@]}"; do
-      git apply "./android/patches/$patch"
+      if [ -f "./android/patches/$patch" ]; then
+        git apply "./android/patches/$patch"
+      else
+        echo "⚠️ Patch not found: $patch – skipping"
+      fi
     done
 
     # ============================================================
     # FIX Winlator paths to Termux paths
     # ============================================================
     echo "Fixing Winlator-specific paths to Termux prefix..."
-    # Replace the symlink target in dlls/ntdll/unix/server.c
-    sed -i 's|/data/data/app.gamenative/files/imagefs/|/data/data/com.termux/files/usr/|g' \
-      dlls/ntdll/unix/server.c
-    # Also ensure any other Winlator-specific paths are corrected (if any)
-    # For example, change "drive_d" symlink target if needed
-    # (The patch creates drive_d pointing to /storage/emulated/0/ – that's fine for Termux)
+    if [ -f "dlls/ntdll/unix/server.c" ]; then
+      sed -i 's|/data/data/app.gamenative/files/imagefs/|/data/data/com.termux/files/usr/|g' \
+        dlls/ntdll/unix/server.c
+    fi
     echo "Paths fixed."
   fi
 
