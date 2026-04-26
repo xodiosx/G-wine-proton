@@ -125,7 +125,7 @@ jobs:
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
             bash build-scripts/build-step-x86_64.sh --configure
           else
-            bash build-scripts/build-step-arm64ec.sh --configure
+            bash build-scripts/Build-termux.sh --configure
           fi
       
       - name: Build Proton for ${{ matrix.arch }}
@@ -133,7 +133,7 @@ jobs:
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
             bash build-scripts/build-step-x86_64.sh --build
           else
-            bash build-scripts/build-step-arm64ec.sh --build
+            bash build-scripts/Build-termux.sh --build
           fi
       
       - name: Install Proton for ${{ matrix.arch }}
@@ -141,7 +141,7 @@ jobs:
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
             bash build-scripts/build-step-x86_64.sh --install
           else
-            bash build-scripts/build-step-arm64ec.sh --install
+            bash build-scripts/Build-termux.sh --install
           fi
       
       - name: Download prefixPack.txz for ${{ matrix.arch }}
@@ -207,7 +207,7 @@ jobs:
           # Create Proton WCP - txz format
           cp $GITHUB_WORKSPACE/prefixPack.txz .
           cp $GITHUB_WORKSPACE/profile.json .
-          tar cJf proton-10.0-4-$ARCH_NAME.wcp bin lib share prefixPack.txz profile.json
+          tar cJf proton-10.0-4-$ARCH_NAME.wcp bin lib share profile.json
           mv proton-10.0-4-$ARCH_NAME.wcp $GITHUB_WORKSPACE/
           
           # Create Wine WCP for CMOD & Ludashi - wcp.xz format
