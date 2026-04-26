@@ -174,6 +174,8 @@ do
             "test-bylaws/server_thread_c.patch"
             "test-bylaws/dlls_ntdll_unix_thread_c.patch"
             "test-bylaws/include_winternl_h.patch"
+            "dlls_ntdll_loader_c.patch"
+            "dlls_ntdll_unix_loader_c.patch"
         )
 
         for patch in "${PATCHES[@]}"; do
