@@ -346,13 +346,19 @@ jobs:
 
                   # --- Replace dlls/ntdll, dlls/winex11.drv, server/esync.c, server/fsync.c, and dlls/amd_ags_x64/unixlib.c with bleeding-edge versions ---
                   echo "Replacing dlls/ntdll, dlls/winex11.drv, server/esync.c, server/fsync.c, and dlls/amd_ags_x64/unixlib.c with bleeding-edge patched versions..."
-                  rm -rf dlls/ntdll dlls/winex11.drv server/esync.c server/fsync.c dlls/amd_ags_x64/unixlib.c 2>/dev/null || true
+                  #rm -rf dlls/ntdll dlls/winex11.drv server/esync.c server/fsync.c dlls/amd_ags_x64/unixlib.c 2>/dev/null || true
                   git clone --depth 1 --branch bleeding-edge https://github.com/xodiosx/Wine-arm64ce.git /tmp/ntdll_patch
                   cp -r /tmp/ntdll_patch/dlls/ntdll dlls/
-                  cp -r /tmp/ntdll_patch/dlls/winex11.drv dlls/
-                  cp /tmp/ntdll_patch/server/esync.c server/
-                  cp /tmp/ntdll_patch/server/fsync.c server/
-                  cp /tmp/ntdll_patch/dlls/amd_ags_x64/unixlib.c dlls/amd_ags_x64/
+                  cp -r /tmp/ntdll_patch/dlls/ntdll/unix/loader.c dlls/ntdll/unix
+                  cp -r /tmp/ntdll_patch/dlls/ntdll/loader.c dlls/ntdll/
+                  cp -r /tmp/ntdll_patch/dlls/ntdl/unix/server.c dlls/ntdl/unix/
+                  cp -r /tmp/ntdll_patch/dlls/ntdll/unix/esync.c dlls/ntdll/unix
+                  cp -r /tmp/ntdll_patch/dlls/ntdll/unix/fsync.c dlls/ntdll/unix                  
+                  cp -r /tmp/ntdll_patch/server/esync.c server/
+                  cp -r /tmp/ntdll_patch/server/fsync.c server/
+                  
+                  cp -r /tmp/ntdll_patch/dlls/winex11.drv dlls/                 
+                  cp -r /tmp/ntdll_patch/dlls/amd_ags_x64/unixlib.c dlls/amd_ags_x64/
                   rm -rf /tmp/ntdll_patch
                   echo "All bleeding-edge replacements applied."
               fi
