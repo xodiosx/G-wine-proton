@@ -1,8 +1,6 @@
 name: Build termux Proton tWine (SDK 28)
 
 on:
-  push:
-    branches: [ main, master, proton_10.0 ]
   
   workflow_dispatch:
 permissions:
@@ -28,12 +26,7 @@ jobs:
           sudo rm -rf /usr/local/share/boost
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           df -h
-      
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      
+
       - name: Set up build environment
         run: |
           sudo dpkg --add-architecture i386
@@ -60,7 +53,7 @@ jobs:
             libpng-dev:i386 \
             zlib1g-dev \
             zlib1g-dev:i386
-      
+
       - name: Download and extract termuxfs (aarch64)
         run: |
           mkdir -p $HOME/termuxfs/aarch64
@@ -68,14 +61,14 @@ jobs:
           wget https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-aarch64.tar
           tar -xf termuxfs-aarch64.tar
           ls -la $HOME/termuxfs/aarch64/
-      
+
       - name: Cache Android NDK
         id: cache-ndk
         uses: actions/cache@v4
         with:
           path: ~/Android/Sdk/ndk/27.3.13750724
           key: android-ndk-r27d
-      
+
       - name: Set up Android NDK
         if: steps.cache-ndk.outputs.cache-hit != 'true'
         run: |
@@ -84,14 +77,14 @@ jobs:
           wget https://dl.google.com/android/repository/android-ndk-r27d-linux.zip
           unzip -q android-ndk-r27d-linux.zip
           mv android-ndk-r27d 27.3.13750724
-      
+
       - name: Cache LLVM MinGW toolchain
         id: cache-llvm-mingw
         uses: actions/cache@v4
         with:
           path: ~/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64
           key: bylaws-llvm-mingw-20250920
-      
+
       - name: Set up LLVM MinGW toolchain
         if: steps.cache-llvm-mingw.outputs.cache-hit != 'true'
         run: |
@@ -99,25 +92,18 @@ jobs:
           cd $HOME/toolchains
           wget https://github.com/bylaws/llvm-mingw/releases/download/20250920/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz
           tar -xf llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz
-      
-      - name: Run autogen.sh
+
+      - name: Clone bleeding-edge Wine source
+        run: |
+          git clone --depth 1 --branch bleeding-edge https://github.com/xodiosx/Wine-arm64ce.git $GITHUB_WORKSPACE/wine
+
+      - name: Run autogen.sh in Wine source
+        working-directory: ${{ github.workspace }}/wine
         run: |
           bash autogen.sh
-      
-      - name: Cache wine-tools
-        id: cache-wine-tools
-        uses: actions/cache@v4
-        with:
-          path: wine-tools
-          key: wine-tools-${{ hashFiles('configure.ac', 'configure') }}
-      
-      - name: Build wine-tools (step 0)
-        if: steps.cache-wine-tools.outputs.cache-hit != 'true'
-        run: |
-          bash build-scripts/build-step0.sh
-      
-      # ---------- aarch64 configure, patch, replace bleeding-edge sources, build and install ----------
-      - name: Build aarch64 Proton (full process)
+
+      - name: Build aarch64 Proton
+        working-directory: ${{ github.workspace }}/wine
         run: |
           cat > build-aarch64.sh << 'BUILDSCRIPT'
           #!/bin/bash
@@ -165,8 +151,8 @@ jobs:
           export FFMPEG_CFLAGS="-I$deps/include/libavutil -I$deps/include/libavcodec -I$deps/include/libavformat"
           export FFMPEG_LIBS="-L$deps/lib -lavutil -lavcodec -lavformat"
 
-          for arg in "$@"
-          do
+          # Handle optional 16KB page size flag
+          for arg in "$@"; do
               if [ "$arg" = "--enable-16kb-pages" ]; then
                   echo "Enabling 16KB page size support..."
                   export TARGET=aarch64-linux-android35
@@ -175,246 +161,101 @@ jobs:
                   export CXXFLAGS=$C_OPTS
                   export LDFLAGS="$LDFLAGS -Wl,-z,max-page-size=16384"
               fi
-
-              if [ "$arg" = "--configure" ]; then
-                  ./configure \
-                      --enable-archs=$WIN_ARCH \
-                      --host=$TARGET \
-                      --prefix $install_dir \
-                      --bindir $install_dir/bin \
-                      --libdir $install_dir/lib \
-                      --exec-prefix $install_dir \
-                      --with-mingw=clang \
-                      --with-wine-tools=./wine-tools \
-                      --enable-win64 \
-                      --enable-arm64ec \
-                      --disable-win16 \
-                      --enable-nls \
-                      --disable-amd_ags_x64 \
-                      --enable-wineandroid_drv=no \
-                      --disable-tests \
-                      --with-alsa \
-                      --without-capi \
-                      --without-coreaudio \
-                      --without-cups \
-                      --without-dbus \
-                      --without-ffmpeg \
-                      --with-fontconfig \
-                      --with-freetype \
-                      --without-gcrypt \
-                      --without-gettext \
-                      --with-gettextpo=no \
-                      --without-gphoto \
-                      --with-gnutls \
-                      --without-gssapi \
-                      --with-gstreamer \
-                      --without-inotify \
-                      --without-krb5 \
-                      --without-netapi \
-                      --without-opencl \
-                      --with-opengl \
-                      --without-osmesa \
-                      --without-oss \
-                      --without-pcap \
-                      --without-pcsclite \
-                      --without-piper \
-                      --with-pthread \
-                      --with-pulse \
-                      --without-sane \
-                      --with-sdl \
-                      --without-udev \
-                      --without-unwind \
-                      --without-usb \
-                      --without-v4l2 \
-                      --without-vosk \
-                      --with-vulkan \
-                      --without-wayland \
-                      --without-xcomposite \
-                      --without-xcursor \
-                      --without-xfixes \
-                      --without-xinerama \
-                      --without-xrandr \
-                      --without-xrender \
-                      --without-xshape \
-                      --without-xshm \
-                      --without-xxf86vm
-
-                  echo "Applying patches..."
-
-                  PATCHES=(
-                      # Network patches
-                      "dlls_dnsapi_libresolv_c.patch"
-                      "dlls_dnsapi_record_c.patch"
-                      "dlls_nsiproxy_sys_ip_c.patch"
-                      "dlls_nsiproxy_sys_ndis_c.patch"
-                      "dlls_nsiproxy_sys_nsi_common_h.patch"
-                      "dlls_ws2_32_socket_c.patch"
-                      "server_token_c.patch"
-                      "server_unicode_c.patch"
-
-                      # SDL patch
-                      "dlls_winebus_sys_bus_sdl_c.patch"
-
-                      # Address space patches
-                      "arm64ec/dlls_ntdll_unix_virtual_c.patch"
-                      "loader_preloader_c.patch"
-
-                      # Syscall patch
-                      "dlls_ntdll_unix_signal_x86_64_c.patch"
-
-                      # Pulse patch
-                      "dlls_winepulse_drv_pulse_c.patch"
-
-                      # Desktop patch
-                      "programs_explorer_desktop_c.patch"
-
-                      # Path patch
-                      "dlls_ntdll_unix_server_c.patch"
-
-                      # Winlator patches
-                      "dlls_amd_ags_x64_unixlib_c.patch"
-                      "dlls_winex11_drv_opengl_c.patch"
-
-                      # Shortcut patch
-                      "programs_winemenubuilder_winemenubuilder_c.patch"
-
-                      # Advapi32 patch
-                      "dlls_advapi32_advapi_c.patch"
-
-                      # Browser patches
-                      "programs_winebrowser_makefile_in.patch"
-                      "programs_winebrowser_main_c.patch"
-
-                      # Clipboard patches
-                      "dlls_user32_clipboard_c.patch"
-                      "dlls_win32u_clipboard_c.patch"
-
-                      # User32 patch
-                      "dlls_user32_makefile_in.patch"
-
-                      # Fix build
-                      "programs_wineboot_wineboot_c.patch"
-                      "dlls_wdscore_wdscore_spec.patch"
-
-                      # Fexcore patches
-                      "dlls_ntdll_loader_c.patch"
-                      "dlls_ntdll_unix_loader_c.patch"
-                      "dlls_wow64_syscall_c.patch"
-                      "loader_wine_inf_in.patch"
-
-                      # Test-bylaws: Extended State (XSTATE/YMM) Support
-                      "test-bylaws/dlls_ntdll_unwind_h.patch"
-                      "test-bylaws/include_winnt_h.patch"
-
-                      # Test-bylaws: Thread Suspension Patches
-                      "test-bylaws/dlls_ntdll_signal_arm64_c.patch"
-                      "test-bylaws/dlls_ntdll_signal_arm64ec_c.patch"
-                      "test-bylaws/dlls_ntdll_signal_x86_64_c.patch"
-                      "test-bylaws/dlls_ntdll_ntdll_spec.patch"
-                      "test-bylaws/dlls_ntdll_ntdll_misc_h.patch"
-                      "test-bylaws/dlls_wow64_process_c.patch"
-                      "test-bylaws/dlls_wow64_wow64_spec.patch"
-
-                      # Test-bylaws: Process and Virtual Memory Management
-                      "test-bylaws/dlls_wow64_virtual_c.patch"
-                      "test-bylaws/server_process_c.patch"
-                      "test-bylaws/dlls_ntdll_unix_process_c.patch"
-
-                      # Test-bylaws: Server and Threading Infrastructure
-                      "test-bylaws/server_thread_h.patch"
-                      "test-bylaws/server_thread_c.patch"
-                      "test-bylaws/dlls_ntdll_unix_thread_c.patch"
-
-                      # Test-bylaws: Internal Headers
-                      "test-bylaws/include_winternl_h.patch"
-                  )
-
-                  for patch in "${PATCHES[@]}"; do
-                      if [ -f "./android/patches/$patch" ]; then
-                          git apply "./android/patches/$patch"
-                      else
-                          echo "⚠️ Patch not found: $patch – skipping"
-                      fi
-                  done
-
-                  echo "Fixing Winlator-specific paths to Termux prefix..."
-                  if [ -f "dlls/ntdll/unix/server.c" ]; then
-                      sed -i 's|/data/data/app.gamenative/files/imagefs/|/data/data/com.termux/files/usr/|g' \
-                          dlls/ntdll/unix/server.c
-                  fi
-                  echo "Paths fixed."
-
-                  # --- Replace dlls/ntdll, dlls/winex11.drv, server/esync.c, server/fsync.c, and dlls/amd_ags_x64/unixlib.c with bleeding-edge versions ---
-                  echo "Replacing dlls/ntdll, dlls/winex11.drv, server/esync.c, server/fsync.c, and dlls/amd_ags_x64/unixlib.c with bleeding-edge patched versions..."
-                  #rm -rf dlls/ntdll dlls/winex11.drv server/esync.c server/fsync.c dlls/amd_ags_x64/unixlib.c 2>/dev/null || true
-                  git clone --depth 1 --branch bleeding-edge https://github.com/xodiosx/Wine-arm64ce.git /tmp/ntdll_patch
-                  cp -r /tmp/ntdll_patch/dlls/ntdll dlls/
-                  cp -r /tmp/ntdll_patch/dlls/ntdll/unix/loader.c dlls/ntdll/unix
-                  cp -r /tmp/ntdll_patch/dlls/ntdll/loader.c dlls/ntdll/
-                  cp -r /tmp/ntdll_patch/dlls/ntdll/unix/server.c dlls/ntdl/unix/
-                  cp -r /tmp/ntdll_patch/dlls/ntdll/unix/esync.c dlls/ntdll/unix
-                  cp -r /tmp/ntdll_patch/dlls/ntdll/unix/fsync.c dlls/ntdll/unix                  
-                  cp -r /tmp/ntdll_patch/server/esync.c server/
-                  cp -r /tmp/ntdll_patch/server/fsync.c server/
-                  
-                  cp -r /tmp/ntdll_patch/dlls/winex11.drv dlls/                 
-                  cp -r /tmp/ntdll_patch/dlls/amd_ags_x64/unixlib.c dlls/amd_ags_x64/
-                  # Core headers
-                  cp -f /tmp/ntdll_patch/include include/
-                  
-
-                  # Wine-specific protocol (very important for ntdll/server match)
-                   mkdir -p include/wine
-                   
-                   cp -r /tmp/ntdll_patch/include/wine/ include/wine/
-
-                   # Also copy related wine headers (prevents hidden breakage)
-                   cp -f /tmp/ntdll_patch/include/wine/*.h include/wine/ 2>/dev/null
-                  
-                  
-                  rm -rf /tmp/ntdll_patch
-                  echo "All bleeding-edge replacements applied."
-              fi
-
-              if [ "$arg" = "--build" ]; then
-                  echo "Building..."
-                  rm -rf $OUTPUT_DIR/bin
-                  rm -rf $OUTPUT_DIR/lib
-                  rm -rf $OUTPUT_DIR/share
-                  rm -rf $install_dir
-                  make -j$(nproc)
-              fi
-
-              if [ "$arg" = "--install" ]; then
-                  echo "Installing..."
-                  mkdir -p $OUTPUT_DIR/bin
-                  mkdir -p $OUTPUT_DIR/lib
-                  mkdir -p $OUTPUT_DIR/share
-                  mkdir -p $install_dir
-                  make install -j$(nproc)
-                  cp -r $install_dir/bin/wine* $OUTPUT_DIR/bin
-                  cp -r $install_dir/bin/reg* $OUTPUT_DIR/bin
-                  cp -r $install_dir/bin/msi* $OUTPUT_DIR/bin
-                  cp -r $install_dir/bin/notepad $OUTPUT_DIR/bin
-                  cp -r $install_dir/lib/wine  $OUTPUT_DIR/lib
-                  cp -r $install_dir/share/wine $OUTPUT_DIR/share
-              fi
           done
+
+          ./configure \
+              --enable-archs=$WIN_ARCH \
+              --host=$TARGET \
+              --prefix $install_dir \
+              --bindir $install_dir/bin \
+              --libdir $install_dir/lib \
+              --exec-prefix $install_dir \
+              --with-mingw=clang \
+              --enable-win64 \
+              --disable-win16 \
+              --enable-nls \
+              --disable-amd_ags_x64 \
+              --enable-wineandroid_drv=no \
+              --disable-tests \
+              --without-alsa \
+              --without-capi \
+              --without-coreaudio \
+              --without-cups \
+              --without-dbus \
+              --without-ffmpeg \
+              --with-fontconfig \
+              --with-freetype \
+              --without-gcrypt \
+              --without-gettext \
+              --with-gettextpo=no \
+              --without-gphoto \
+              --with-gnutls \
+              --without-gssapi \
+              --with-gstreamer \
+              --without-inotify \
+              --without-krb5 \
+              --without-netapi \
+              --without-opencl \
+              --with-opengl \
+              --without-osmesa \
+              --without-oss \
+              --without-pcap \
+              --without-pcsclite \
+              --without-piper \
+              --with-pthread \
+              --with-pulse \
+              --without-sane \
+              --with-sdl \
+              --without-udev \
+              --without-unwind \
+              --without-usb \
+              --without-v4l2 \
+              --without-vosk \
+              --with-vulkan \
+              --without-wayland \
+              --without-xcomposite \
+              --without-xcursor \
+              --without-xfixes \
+              --without-xinerama \
+              --without-xrandr \
+              --without-xrender \
+              --without-xshape \
+              --without-xshm \
+              --without-xxf86vm
+
+          echo "Building wine tools (host part)..."
+          make tools -j$(nproc)
+
+          echo "Building Wine..."
+          make -j$(nproc)
+
+          echo "Installing..."
+          mkdir -p $OUTPUT_DIR/bin
+          mkdir -p $OUTPUT_DIR/lib
+          mkdir -p $OUTPUT_DIR/share
+          mkdir -p $install_dir
+          make install -j$(nproc)
+          cp -r $install_dir/bin/wine* $OUTPUT_DIR/bin
+          cp -r $install_dir/bin/reg* $OUTPUT_DIR/bin
+          cp -r $install_dir/bin/msi* $OUTPUT_DIR/bin
+          cp -r $install_dir/bin/notepad $OUTPUT_DIR/bin
+          cp -r $install_dir/lib/wine  $OUTPUT_DIR/lib
+          cp -r $install_dir/share/wine $OUTPUT_DIR/share
           BUILDSCRIPT
 
           chmod +x build-aarch64.sh
-          ./build-aarch64.sh --configure --build --install
-      
+          ./build-aarch64.sh
+
       # ---------- Packaging (arm64ec only) ----------
       - name: Download prefixPack.txz (arm64ec)
         run: |
-          wget https://github.com/GameNative/bionic-prefix-files/raw/main/prefixPack-arm64ec.txz -O $GITHUB_WORKSPACE/prefixPack.txz
-      
+           ls
+          #wget https://github.com/GameNative/bionic-prefix-files/raw/main/prefixPack-arm64ec.txz -O $GITHUB_WORKSPACE/prefixPack.txz
+
       - name: Generate profile.json files
         run: |
           ARCH_NAME="arm64ec"
           
-          # Proton profile.json
           cat > $GITHUB_WORKSPACE/profile.json << EOF
           {
             "type": "Proton",
@@ -430,7 +271,6 @@ jobs:
           }
           EOF
           
-          # Wine profile.json for Ludashi
           cat > $GITHUB_WORKSPACE/profile-wine.json << EOF
           {
             "type": "Wine",
@@ -445,7 +285,7 @@ jobs:
             }
           }
           EOF
-      
+
       - name: Package build artifacts
         run: |
           OUTPUT_DIR="$HOME/compiled-files-aarch64"
@@ -453,34 +293,32 @@ jobs:
           
           cd $OUTPUT_DIR
           
-          # Proton WCP - txz format
-          cp $GITHUB_WORKSPACE/prefixPack.txz .
+          #cp $GITHUB_WORKSPACE/prefixPack.txz .
           cp $GITHUB_WORKSPACE/profile.json .
           tar cJf proton-10.0-4-$ARCH_NAME.wcp bin lib share profile.json
           mv proton-10.0-4-$ARCH_NAME.wcp $GITHUB_WORKSPACE/
           
-          # Wine WCP for CMOD & Ludashi - wcp.xz format
           cp $GITHUB_WORKSPACE/profile-wine.json profile.json
-          tar cJf proton-wine-10.0-4-$ARCH_NAME.wcp.xz bin lib share prefixPack.txz profile.json
+          tar cJf proton-wine-10.0-4-$ARCH_NAME.wcp.xz bin lib share profile.json
           mv proton-wine-10.0-4-$ARCH_NAME.wcp.xz $GITHUB_WORKSPACE/
-      
+
       - name: Set ARCH_NAME for artifact upload
         run: echo "ARCH_NAME=arm64ec" >> $GITHUB_ENV
-      
+
       - name: Upload Proton build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: proton-arm64ec
           path: proton-10.0-4-arm64ec.wcp
           retention-days: 30
-      
+
       - name: Upload Wine build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: proton-wine-arm64ec
           path: proton-wine-10.0-4-arm64ec.wcp.xz
           retention-days: 30
-  
+
   release:
     needs: build
     runs-on: ubuntu-24.04
@@ -491,33 +329,28 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+
       - name: Prepare release files
         run: |
           mkdir -p release
           find artifacts -name "*.wcp" -exec cp {} release/ \;
           find artifacts -name "*.wcp.xz" -exec cp {} release/ \;
           ls -lah release/
-      
+
       - name: Generate date-based tag
         id: generate_tag
         run: |
           DATE=$(date +%Y%m%d)
-          
-          # Get existing tags for today with SDK28 suffix
           EXISTING_TAGS=$(git tag -l "build-${DATE}-*-sdk28" | sort -V | tail -1)
-          
           if [ -z "$EXISTING_TAGS" ]; then
             BUILD_NUMBER=1
           else
-            # Extract build number from last tag and increment
             BUILD_NUMBER=$(echo "$EXISTING_TAGS" | sed "s/build-${DATE}-//" | sed "s/-sdk28//" | awk '{print $1 + 1}')
           fi
-          
           TAG_NAME="build-${DATE}-${BUILD_NUMBER}-sdk28"
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "Generated tag: ${TAG_NAME}"
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
