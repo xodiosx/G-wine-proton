@@ -351,7 +351,7 @@ jobs:
                   cp -r /tmp/ntdll_patch/dlls/ntdll dlls/
                   cp -r /tmp/ntdll_patch/dlls/ntdll/unix/loader.c dlls/ntdll/unix
                   cp -r /tmp/ntdll_patch/dlls/ntdll/loader.c dlls/ntdll/
-                  cp -r /tmp/ntdll_patch/dlls/ntdl/unix/server.c dlls/ntdl/unix/
+                  cp -r /tmp/ntdll_patch/dlls/ntdll/unix/server.c dlls/ntdl/unix/
                   cp -r /tmp/ntdll_patch/dlls/ntdll/unix/esync.c dlls/ntdll/unix
                   cp -r /tmp/ntdll_patch/dlls/ntdll/unix/fsync.c dlls/ntdll/unix                  
                   cp -r /tmp/ntdll_patch/server/esync.c server/
