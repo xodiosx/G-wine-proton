@@ -360,12 +360,13 @@ jobs:
                   cp -r /tmp/ntdll_patch/dlls/winex11.drv dlls/                 
                   cp -r /tmp/ntdll_patch/dlls/amd_ags_x64/unixlib.c dlls/amd_ags_x64/
                   # Core headers
-                  cp -f /tmp/ntdll_patch/include/winternl.h include/
-                  cp -f /tmp/ntdll_patch/include/ntifs.h include/
+                  cp -f /tmp/ntdll_patch/include include/
+                  
 
                   # Wine-specific protocol (very important for ntdll/server match)
                    mkdir -p include/wine
-                   cp -f /tmp/ntdll_patch/include/wine/server_protocol.h include/wine/
+                   
+                   cp -r /tmp/ntdll_patch/include/wine/ include/wine/
 
                    # Also copy related wine headers (prevents hidden breakage)
                    cp -f /tmp/ntdll_patch/include/wine/*.h include/wine/ 2>/dev/null
