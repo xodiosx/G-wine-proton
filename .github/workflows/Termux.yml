@@ -121,6 +121,16 @@ jobs:
           export TARGET=aarch64-linux-android28
           export PATH=$LLVM_MINGW_TOOLCHAIN:$PATH
 
+          # --- Step 1: Build native host wine-tools ---
+          echo "Building native wine tools (host)..."
+          mkdir -p host-build
+          cd host-build
+          ../configure --enable-win64  2>&1 | tail -20
+          make tools -j$(nproc)
+          cd ..
+          echo "Host wine tools built successfully."
+
+          # --- Step 2: Set up cross-compilation environment ---
           export CC=$TOOLCHAIN/$TARGET-clang
           export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++
@@ -151,10 +161,9 @@ jobs:
           export FFMPEG_CFLAGS="-I$deps/include/libavutil -I$deps/include/libavcodec -I$deps/include/libavformat"
           export FFMPEG_LIBS="-L$deps/lib -lavutil -lavcodec -lavformat"
 
-          # Handle optional 16KB page size flag
+          # Optional 16KB pages support (pass --enable-16kb-pages to this script)
           for arg in "$@"; do
               if [ "$arg" = "--enable-16kb-pages" ]; then
-                  echo "Enabling 16KB page size support..."
                   export TARGET=aarch64-linux-android35
                   export C_OPTS="$C_OPTS -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES"
                   export CFLAGS=$C_OPTS
@@ -163,6 +172,7 @@ jobs:
               fi
           done
 
+          # --- Step 3: Cross-configure, build, install ---
           ./configure \
               --enable-archs=$WIN_ARCH \
               --host=$TARGET \
@@ -171,13 +181,15 @@ jobs:
               --libdir $install_dir/lib \
               --exec-prefix $install_dir \
               --with-mingw=clang \
+              --with-wine-tools=./host-build \
               --enable-win64 \
+              --enable-arm64ec \
               --disable-win16 \
               --enable-nls \
               --disable-amd_ags_x64 \
               --enable-wineandroid_drv=no \
               --disable-tests \
-              --without-alsa \
+              --with-alsa \
               --without-capi \
               --without-coreaudio \
               --without-cups \
@@ -223,9 +235,6 @@ jobs:
               --without-xshm \
               --without-xxf86vm
 
-          echo "Building wine tools (host part)..."
-          make tools -j$(nproc)
-
           echo "Building Wine..."
           make -j$(nproc)
 
@@ -249,13 +258,11 @@ jobs:
       # ---------- Packaging (arm64ec only) ----------
       - name: Download prefixPack.txz (arm64ec)
         run: |
-           ls
-          #wget https://github.com/GameNative/bionic-prefix-files/raw/main/prefixPack-arm64ec.txz -O $GITHUB_WORKSPACE/prefixPack.txz
+          wget https://github.com/GameNative/bionic-prefix-files/raw/main/prefixPack-arm64ec.txz -O $GITHUB_WORKSPACE/prefixPack.txz
 
       - name: Generate profile.json files
         run: |
           ARCH_NAME="arm64ec"
-          
           cat > $GITHUB_WORKSPACE/profile.json << EOF
           {
             "type": "Proton",
@@ -270,7 +277,6 @@ jobs:
             }
           }
           EOF
-          
           cat > $GITHUB_WORKSPACE/profile-wine.json << EOF
           {
             "type": "Wine",
@@ -290,16 +296,13 @@ jobs:
         run: |
           OUTPUT_DIR="$HOME/compiled-files-aarch64"
           ARCH_NAME="arm64ec"
-          
           cd $OUTPUT_DIR
-          
-          #cp $GITHUB_WORKSPACE/prefixPack.txz .
+          cp $GITHUB_WORKSPACE/prefixPack.txz .
           cp $GITHUB_WORKSPACE/profile.json .
           tar cJf proton-10.0-4-$ARCH_NAME.wcp bin lib share profile.json
           mv proton-10.0-4-$ARCH_NAME.wcp $GITHUB_WORKSPACE/
-          
           cp $GITHUB_WORKSPACE/profile-wine.json profile.json
-          tar cJf proton-wine-10.0-4-$ARCH_NAME.wcp.xz bin lib share profile.json
+          tar cJf proton-wine-10.0-4-$ARCH_NAME.wcp.xz bin lib share prefixPack.txz profile.json
           mv proton-wine-10.0-4-$ARCH_NAME.wcp.xz $GITHUB_WORKSPACE/
 
       - name: Set ARCH_NAME for artifact upload
